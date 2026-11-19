@@ -21,15 +21,26 @@ Depois de instalado, ele abre como aplicativo e funciona sem internet.
 
 ## Conteúdo
 
-- **Prontas:** dias 1–112 (Fase 1, nível A1, e Fase 2, nível A2: passado, viagens, trabalho, saúde, pronomes, serviços públicos, imperativo).
-- **Próximas:** dias 113–182 (Fases 3 e 4: futuro, condicional, opinião, escrita, Itália e cidadania, simulados).
+Curso completo, 182 lições:
 
-As lições ficam em `data.js`. Para adicionar dias, siga o mesmo formato:
+| Fase | Dias | Nível | Conteúdo |
+|---|---|---|---|
+| 1 | 1–56 | A1 | Pronúncia, apresentação, família, casa, cidade, rotina, comida |
+| 2 | 57–112 | A2 | Passado, viagens, trabalho, saúde, pronomes, serviços públicos, imperativo |
+| 3 | 113–147 | B1 | Futuro, condicional, conectivos, opinião, e-mails, Itália e cidadania |
+| 4 | 148–182 | Prova | Simulados de Ascolto, Lettura, Strutture, Scrittura e Orale |
+
+As lições ficam em `data.js`. Formato de um dia:
 
 ```js
 { d: 57, u: 9, t: 'Título', tip: 'Regra do dia',
-  w: [['italiano', 'português'], ...],   // palavras
-  s: [['Frase em italiano.', 'Tradução.'], ...] }  // frases
+  w: [['italiano', 'português'], ...],                 // palavras
+  s: [['Frase em italiano.', 'Tradução.'], ...],       // frases
+  listen: [{ title, text, q: [[pergunta, [opções], índiceCerto]] }],  // escuta
+  read:   [{ title, text, q: [...] }],                 // leitura
+  cloze:  [['Frase com ___', [opções], índiceCerto]],  // gramática
+  write:  { task, min, model },                        // redação
+  oral:   { task, model } }                            // prova oral
 ```
 
 Ao publicar uma atualização, mude `VERSION` em `sw.js` para os aparelhos baixarem a versão nova.

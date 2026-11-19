@@ -131,7 +131,7 @@ function reviewItems(x, n) {
   const errs = Object.entries(st.mistakes).filter(([k]) => !exclude.has(k)).sort((a, b) => b[1].n - a[1].n).slice(0, n);
   for (const [k, m] of errs) out.push(m.s ? sentEx({ it: k, pt: m.pt }, 'type') : wordEx({ it: k, pt: m.pt, d: m.d || x.d }, pick(['mc_it', 'mc_pt', 'listen'])));
   // 2) revisão espaçada: ontem, 3 e 7 dias antes
-  for (const back of [1, 3, 7, 14, 30]) {
+  for (const back of [1, 3, 7, 14, 21, 30, 45, 60, 90]) {
     if (out.length >= n) break;
     const y = byDay[x.d - back];
     if (!y || y.r || !y.w) continue;
@@ -144,26 +144,46 @@ function buildLesson(x) {
   const items = [];
   let W, S;
   if (x.r) {
-    const from = x.cp ? DAYS.filter(y => !y.r && y.d < x.d && y.d > x.d - 28) : DAYS.filter(y => !y.r && y.u === x.u && y.d < x.d);
-    W = sample(from.flatMap(wordsOf), x.cp ? 10 : 8);
-    S = sample(from.flatMap(sentsOf), x.cp ? 6 : 4);
+    const prev = DAYS.filter(y => !y.r && y.d < x.d);
+    const from = x.all ? prev : x.cp ? prev.filter(y => y.d > x.d - 28) : prev.filter(y => y.u === x.u);
+    const nw = x.cp || x.all ? 10 : 8, ns = x.cp || x.all ? 6 : 4;
+    W = sample(from.flatMap(wordsOf), nw);
+    S = sample(from.flatMap(sentsOf), ns);
+    // unidades de simulado têm poucas palavras: completa com o resto do curso
+    if (W.length < nw) W.push(...sample(prev.flatMap(wordsOf).filter(w => !W.includes(w)), nw - W.length));
+    if (S.length < ns) S.push(...sample(prev.flatMap(sentsOf).filter(s => !S.includes(s)), ns - S.length));
     items.push({ type: 'tip', title: x.cp ? '🏆 Checkpoint' : '⭐ Revisão', text: x.tip });
+    if (x.all) items.push(...reviewItems(x, 6));
   } else {
     W = wordsOf(x); S = sentsOf(x);
-    items.push({ type: 'tip', title: 'Regra do dia', text: x.tip });
-    items.push({ type: 'words', words: W });
+    items.push({ type: 'tip', title: W.length ? 'Regra do dia' : '🎓 Treino de prova', text: x.tip });
+    if (W.length) items.push({ type: 'words', words: W });
   }
   const kinds = ['mc_it', 'listen', 'mc_pt'];
   const wex = shuffle(W.map((w, i) => wordEx(w, kinds[i % 3])));
   items.push(...wex.slice(0, Math.ceil(wex.length / 2)));
-  items.push({ type: 'match', pairs: sample(W, Math.min(5, W.length)) });
+  if (W.length >= 3) items.push({ type: 'match', pairs: sample(W, Math.min(5, W.length)) });
   items.push(...wex.slice(Math.ceil(wex.length / 2)));
   if (!x.r) items.push(...reviewItems(x, 3));
-  const sk = ['build', 'dictation', 'type', 'build', 'dictation', 'type'];
+  const sk = x.dict ? ['dictation', 'dictation', 'dictation', 'dictation'] : ['build', 'dictation', 'type', 'build', 'dictation', 'type'];
   S.forEach((s, i) => items.push(sentEx(s, sk[i])));
-  if (x.cp) items.push({ type: 'match', pairs: sample(W, Math.min(5, W.length)) });
+  if (x.cp && W.length >= 3) items.push({ type: 'match', pairs: sample(W, Math.min(5, W.length)) });
+  items.push(...examItems(x));
   if (S.length) items.push({ type: 'speak', key: S[0].it, it: S[0].it, pt: S[0].pt });
   return items;
+}
+// Exercícios no formato da prova: ascolto, lettura, strutture, scrittura, orale.
+function examItems(x) {
+  const out = [];
+  const passage = (p, audio) => p.q.forEach(([q, opts, a], i) =>
+    out.push({ type: 'reading', audio, title: p.title, text: p.text, q, options: shuffle(opts), answer: opts[a], first: i === 0 }));
+  (x.listen || []).forEach(p => passage(p, true));
+  (x.read || []).forEach(p => passage(p, false));
+  for (const [q, opts, a] of x.cloze || [])
+    out.push({ type: 'mc', title: q.includes('___') ? 'Complete a frase' : 'Escolha a opção correta', q, options: shuffle(opts), answer: opts[a], full: q.includes('___') ? q.replace('___', opts[a]).replace(/\s*\(.*\)$/, '') : null });
+  [].concat(x.write || []).forEach(w => out.push({ type: 'write', ...w }));
+  [].concat(x.oral || []).forEach(o => out.push({ type: 'oral', ...o }));
+  return out;
 }
 const graded = i => !['tip', 'words'].includes(i.type);
 
@@ -233,8 +253,10 @@ function renderHome(m) {
     });
     sec.append(lane); m.append(sec);
   }
-  m.append(h('p', { class: 'note', style: 'text-align:center;margin:10px 0 30px' },
-    `Lições prontas: dias 1 a ${DAYS[DAYS.length - 1].d} de ${TOTAL_DAYS}. As próximas unidades serão liberadas em atualizações.`));
+  const lastD = DAYS[DAYS.length - 1].d;
+  m.append(h('p', { class: 'note', style: 'text-align:center;margin:10px 0 30px' }, lastD >= TOTAL_DAYS
+    ? `Fim da trilha: ${TOTAL_DAYS} lições até a prova. In bocca al lupo! 🍀`
+    : `Lições prontas: dias 1 a ${lastD} de ${TOTAL_DAYS}. As próximas unidades serão liberadas em atualizações.`));
 }
 function openDay(x) {
   if (!isOpen(x.d)) return toast(`Conclua o dia ${x.d - 1} primeiro.`);
@@ -242,7 +264,9 @@ function openDay(x) {
   const v = sheet(
     h('span', { class: 'tag' + (x.r ? ' rev' : '') }, `Dia ${x.d} · ${unitOf(x.u).title}`),
     h('h3', {}, x.t),
-    h('p', {}, done ? `Concluído em ${done.date.split('-').reverse().join('/')} · precisão ${done.acc}%` : x.r ? 'Lição de revisão com as palavras e frases das últimas aulas.' : `${(x.w || []).length} palavras novas e ${(x.s || []).length} frases.`),
+    h('p', {}, done ? `Concluído em ${done.date.split('-').reverse().join('/')} · precisão ${done.acc}%` : x.r ? 'Lição de revisão com as palavras e frases das últimas aulas.'
+      : [x.w && `${x.w.length} palavras novas`, x.s && `${x.s.length} frases`, x.listen && '🎧 escuta', x.read && '📖 leitura',
+        x.cloze && '🧩 gramática', x.write && '✍️ redação', x.oral && '🗣️ prova oral'].filter(Boolean).join(' · ') + '.'),
     h('button', { class: 'btn', onclick: () => { v.remove(); startLesson(x.d); } }, done ? 'Refazer (+5 XP)' : 'Começar (+10 XP)'));
 }
 
@@ -282,6 +306,7 @@ function renderLesson() {
   app.onkeydown = null;
   document.onkeydown = e => {
     if (e.key !== 'Enter' || view !== 'lesson') return;
+    if (e.target.dataset?.multi) return; // redação: Enter quebra linha
     if (e.target.tagName === 'TEXTAREA') e.preventDefault();
     const b = $('.foot .btn'); if (b && !b.disabled) b.click();
   };
@@ -363,7 +388,59 @@ const EX = {
     }, o)));
     el.append(opts);
     if (item.qIt) setTimeout(() => say(item.q), 300);
-    return { check: () => ({ ok: sel === item.answer, solution: item.answer }) };
+    return { check: () => ({ ok: sel === item.answer, solution: item.full || item.answer, audio: item.full }) };
+  },
+  reading(item, el, api) {
+    let sel = null;
+    el.append(h('span', { class: 'tag' }, item.audio ? '🎧 Ascolto' : '📖 Lettura'));
+    if (item.audio) {
+      el.append(h('p', { class: 'note' }, item.first ? 'Leia a pergunta, depois ouça (pode ouvir 2 vezes).' : 'Mesmo áudio. Ouça de novo se precisar.'),
+        h('div', { class: 'listen-row' }, spk(item.text, 'big'), spk(item.text, 'slow')));
+    } else {
+      el.append(h('div', { class: 'card passage' }, item.title ? h('b', {}, item.title) : null, h('p', {}, item.text)));
+    }
+    el.append(h('h2', {}, item.q));
+    const opts = h('div', { class: 'opts' }, item.options.map(o => h('button', {
+      class: 'opt', onclick: e => { sel = o; opts.querySelectorAll('.opt').forEach(b => b.classList.remove('sel')); e.currentTarget.classList.add('sel'); api.ready(true); }
+    }, o)));
+    el.append(opts);
+    return {
+      check: () => {
+        if (item.audio) el.append(h('div', { class: 'card passage', style: 'margin-top:16px' }, h('b', {}, 'Transcrição'), h('p', {}, item.text)));
+        return { ok: sel === item.answer, solution: item.answer };
+      }
+    };
+  },
+  write(item, el, api) {
+    const words = () => ta.value.trim().split(/\s+/).filter(Boolean).length;
+    el.append(h('span', { class: 'tag' }, '✍️ Scrittura'), h('h2', {}, 'Escreva em italiano'),
+      h('div', { class: 'card tip-card' }, item.task),
+      h('p', { class: 'note' }, `Escreva pelo menos ${item.min} palavras. Depois compare com a resposta-modelo.`));
+    const count = h('div', { class: 'note', style: 'text-align:right;margin-top:6px' }, '0 palavras');
+    const ta = h('textarea', { 'data-multi': '1', style: 'min-height:200px', placeholder: 'Scrivi qui…', spellcheck: 'false',
+      oninput: () => { const n = words(); count.textContent = `${n} palavras`; api.ready(n >= Math.ceil(item.min * 0.6)); } });
+    el.append(ta, count);
+    return {
+      check: () => {
+        const n = words();
+        const model = h('div', { class: 'card', style: 'margin-top:16px' }, h('span', { class: 'tag' }, 'Resposta-modelo'),
+          h('div', { style: 'white-space:pre-line;font-size:16px' }, item.model),
+          h('p', { class: 'note' }, 'Compare: estrutura, conectivos, tempos verbais. Para uma correção detalhada, copie seu texto e peça ao professor no Claude: "corrigir: …"'));
+        el.append(model); setTimeout(() => model.scrollIntoView({ behavior: 'smooth' }), 60);
+        return { ok: true, note: n >= item.min ? 'Texto entregue!' : `Entregue com ${n} palavras. Na prova, escreva pelo menos ${item.min}.`, solution: 'Compare com a resposta-modelo acima.' };
+      }
+    };
+  },
+  oral(item, el, api) {
+    el.append(h('span', { class: 'tag' }, '🗣️ Orale'), h('h2', {}, 'Responda em voz alta'),
+      h('div', { class: 'card tip-card' }, item.task),
+      h('p', { class: 'note' }, 'Fale por cerca de 1 minuto, como na prova. Se puder, grave no celular e ouça depois.'));
+    const model = h('div', { class: 'card', style: 'display:none;margin-top:16px' }, h('span', { class: 'tag' }, 'Resposta-modelo'),
+      h('div', { class: 'prompt', style: 'margin:6px 0 0;align-items:flex-start' }, spk(item.model), h('div', { style: 'white-space:pre-line;font-size:16px;line-height:1.5' }, item.model)));
+    const done = h('button', { class: 'btn', style: 'margin-top:16px', onclick: () => api.finish(true, { note: 'Ótimo treino!', solution: 'Repita a resposta-modelo em voz alta mais uma vez.' }) }, 'Pronto, terminei');
+    const show = h('button', { class: 'btn blue', style: 'margin-top:16px', onclick: () => { model.style.display = ''; show.replaceWith(done); say(item.model); setTimeout(() => model.scrollIntoView({ behavior: 'smooth' }), 60); } }, 'Já falei — ver modelo');
+    el.append(show, model);
+    return { auto: true };
   },
   listen(item, el, api) {
     let sel = null;
