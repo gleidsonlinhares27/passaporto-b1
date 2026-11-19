@@ -1,5 +1,5 @@
 // Cache do app para funcionar offline. Mude VERSION a cada publicação.
-const VERSION = 'passaporto-v1';
+const VERSION = 'passaporto-v2';
 const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'data.js', 'manifest.webmanifest',
   'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 

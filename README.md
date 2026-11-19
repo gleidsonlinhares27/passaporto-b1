@@ -21,8 +21,8 @@ Depois de instalado, ele abre como aplicativo e funciona sem internet.
 
 ## Conteúdo
 
-- **Prontas:** dias 1–56 (Fase 1, nível A1).
-- **Próximas:** dias 57–182 (Fases 2 a 4: passado, trabalho, saúde, serviços públicos, futuro, condicional, escrita, simulados).
+- **Prontas:** dias 1–112 (Fase 1, nível A1, e Fase 2, nível A2: passado, viagens, trabalho, saúde, pronomes, serviços públicos, imperativo).
+- **Próximas:** dias 113–182 (Fases 3 e 4: futuro, condicional, opinião, escrita, Itália e cidadania, simulados).
 
 As lições ficam em `data.js`. Para adicionar dias, siga o mesmo formato:
 
